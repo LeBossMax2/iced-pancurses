@@ -1,11 +1,25 @@
 use crate::primitive::Primitive;
 use crate::TerminalRenderer;
 use iced_native::widget::text_input;
-use iced_native::{Font, HorizontalAlignment, Point, Rectangle, VerticalAlignment};
+use iced_native::{HorizontalAlignment, Point, Rectangle, VerticalAlignment};
 
 impl text_input::Renderer for TerminalRenderer {
-    fn default_size(&self) -> u16 {
-        3
+    type Style = ();
+
+    fn measure_value(&self, value: &str, _size: u16, _font: Self::Font) -> f32
+    {
+        value.chars().count() as f32
+    }
+
+    fn offset(
+        &self,
+        _text_bounds: Rectangle,
+        _font: Self::Font,
+        _size: u16,
+        _value: &text_input::Value,
+        _state: &text_input::State,
+    ) -> f32 {
+        0.0
     }
 
     fn draw(
@@ -13,10 +27,12 @@ impl text_input::Renderer for TerminalRenderer {
         bounds: Rectangle,
         src_text_bounds: Rectangle,
         _cursor_position: Point,
-        _size: u16,
+        font: Self::Font,
+        size: u16,
         placeholder: &str,
         value: &text_input::Value,
         _state: &text_input::State,
+        _style: &Self::Style,
     ) -> Primitive {
         let mut text = value.to_string();
         if text == "" {
@@ -30,10 +46,11 @@ impl text_input::Renderer for TerminalRenderer {
         };
         let prim_text = <Self as iced_native::widget::text::Renderer>::draw(
             self,
+            &Default::default(),
             bounds_text,
             &text,
-            1,
-            Font::Default,
+            size - 1,
+            font,
             None,
             HorizontalAlignment::Left,
             VerticalAlignment::Top,

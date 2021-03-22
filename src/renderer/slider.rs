@@ -7,9 +7,9 @@ use iced_native::{Point, Rectangle};
 use std::ops::RangeInclusive;
 
 impl slider::Renderer for TerminalRenderer {
-    fn height(&self) -> u32 {
-        1
-    }
+    type Style = ();
+
+    const DEFAULT_HEIGHT: u16 = 1;
 
     fn draw(
         &mut self,
@@ -18,6 +18,7 @@ impl slider::Renderer for TerminalRenderer {
         range: RangeInclusive<f32>,
         value: f32,
         _is_dragging: bool,
+        _style: &Self::Style,
     ) -> Primitive {
         let (range_start, range_end) = range.into_inner();
         let marker_offset =

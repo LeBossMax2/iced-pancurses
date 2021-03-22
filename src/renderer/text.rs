@@ -2,14 +2,16 @@ use crate::primitive::Primitive;
 use crate::renderer::TerminalRenderer;
 
 use iced_native::widget::text;
-use iced_native::{Color, Font, HorizontalAlignment, Rectangle, Size, VerticalAlignment};
+use iced_native::{Color, HorizontalAlignment, Rectangle, Size, VerticalAlignment};
 
 impl<W: std::io::Write> text::Renderer for TerminalRenderer<W> {
+    type Font = (); // No external font
+
     fn default_size(&self) -> u16 {
         1
     }
 
-    fn measure(&self, content: &str, _size: u16, _font: Font, bounds: Size) -> (f32, f32) {
+    fn measure(&self, content: &str, _size: u16, _font: Self::Font, bounds: Size) -> (f32, f32) {
         let content: String = content.into();
         let max_x = bounds.width as u32;
         let max_y = bounds.height as u32;
@@ -19,10 +21,11 @@ impl<W: std::io::Write> text::Renderer for TerminalRenderer<W> {
 
     fn draw(
         &mut self,
+        defaults: &Self::Defaults,
         bounds: Rectangle,
         content: &str,
         _size: u16,
-        _font: Font,
+        _font: Self::Font,
         color: Option<Color>,
         horizontal_alignment: HorizontalAlignment,
         _vertical_alignment: VerticalAlignment,

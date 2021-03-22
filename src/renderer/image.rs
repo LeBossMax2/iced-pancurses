@@ -1,7 +1,7 @@
 use crate::primitive::Primitive;
 use crate::TerminalRenderer;
 use iced_native::widget::image;
-use iced_native::{Font, HorizontalAlignment, Layout, VerticalAlignment};
+use iced_native::{HorizontalAlignment, Layout, VerticalAlignment};
 
 // TODO: Properly support image rendering using w3img backend or fallback pixel buffer
 
@@ -16,10 +16,11 @@ impl image::Renderer for TerminalRenderer {
         bounds.y += 1.;
         let prim_text = <Self as iced_native::widget::text::Renderer>::draw(
             self,
+            &Default::default(),
             bounds,
             "Unsupported",
             1,
-            Font::Default,
+            Default::default(),
             None,
             HorizontalAlignment::Center,
             VerticalAlignment::Center,

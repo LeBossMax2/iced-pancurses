@@ -5,11 +5,16 @@ use iced_native::widget::scrollable;
 use iced_native::Rectangle;
 
 impl scrollable::Renderer for TerminalRenderer {
+    type Style = ();
+
     fn scrollbar(
         &self,
         _bounds: Rectangle,
         _content_bounds: Rectangle,
         _offset: u32,
+        _scrollbar_width: u16,
+        _scrollbar_margin: u16,
+        _scroller_width: u16,
     ) -> Option<scrollable::Scrollbar> {
         None
     }
@@ -23,6 +28,7 @@ impl scrollable::Renderer for TerminalRenderer {
         _is_mouse_over_scrollbar: bool,
         _scrollbar: Option<scrollable::Scrollbar>,
         offset: u32,
+        _style: &Self::Style,
         content: Self::Output,
     ) -> Primitive {
         Primitive::Group(vec![

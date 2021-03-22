@@ -35,9 +35,9 @@ impl Sandbox for MyState {
         .into()
     }
 
-    fn update(&mut self, _messages: Vec<Self::Message>) {}
+    fn update(&mut self, _message: Self::Message) {}
 }
 
-fn main() -> terminal::error::Result<()> {
+fn main() -> iced_pancurses::Result {
     MyState::run()
 }

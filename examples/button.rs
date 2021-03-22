@@ -44,13 +44,13 @@ impl Sandbox for MyState {
         }
     }
 
-    fn update(&mut self, messages: Vec<MyMessage>) {
-        messages.into_iter().for_each(|m| match m {
+    fn update(&mut self, message: MyMessage) {
+        match message {
             MyMessage::ClickedButton => self.clicked += 1,
-        });
+        }
     }
 }
 
-fn main() {
+fn main() -> iced_pancurses::Result {
     MyState::run()
 }

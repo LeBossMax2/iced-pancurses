@@ -51,17 +51,17 @@ impl Sandbox for MyState {
         }
     }
 
-    fn update(&mut self, messages: Vec<MyMessage>) {
-        messages.into_iter().for_each(|msg| match msg {
+    fn update(&mut self, message: MyMessage) {
+        match message {
             MyMessage::ToggleTestCheckbox => {
                 self.checked_test_checkbox = !self.checked_test_checkbox
             }
             MyMessage::ToggleOtherCheckbox => {
                 self.checked_test_other_checkbox = !self.checked_test_other_checkbox
             }
-        })
+        }
     }
 }
-fn main() {
+fn main() -> iced_pancurses::Result {
     MyState::run()
 }

@@ -10,7 +10,7 @@ impl Sandbox for MyState {
         MyState
     }
 
-    fn update(&mut self, _messages: Vec<()>) {}
+    fn update(&mut self, _message: ()) {}
 
     fn view(&mut self) -> Element<'_, (), TerminalRenderer> {
         Container::new(
@@ -28,6 +28,6 @@ impl Sandbox for MyState {
     }
 }
 
-fn main() {
+fn main() -> iced_pancurses::Result {
     MyState::run()
 }

@@ -92,10 +92,10 @@ impl Sandbox for MyState {
         }
     }
 
-    fn update(&mut self, messages: Vec<MyMessage>) {
-        messages.into_iter().for_each(|m| match m {
+    fn update(&mut self, message: MyMessage) {
+        match message {
             MyMessage::SelectColor(c) => self.selected_color = c,
-        });
+        }
     }
 }
 
@@ -104,6 +104,6 @@ pub enum MyMessage {
     SelectColor(ExampleColor),
 }
 
-fn main() {
+fn main() -> iced_pancurses::Result {
     MyState::run()
 }

@@ -1,23 +1,24 @@
-//mod button;
-//mod checkbox;
+mod container;
+mod button;
+mod checkbox;
 mod column;
-//mod debugger;
-//mod image;
-//mod radio;
-//mod row;
-//mod scrollable;
-//mod slider;
-//mod space;
+mod debugger;
+mod image;
+mod radio;
+mod row;
+mod scrollable;
+mod slider;
+mod space;
 mod text;
-//mod text_input;
+mod text_input;
 
 use crate::primitive::Primitive;
 use core::time::Duration;
-use iced_native::input::{
-    keyboard::KeyCode, mouse::Button, mouse::Event as MouseEvent, ButtonState,
+use iced_native::{
+    keyboard::KeyCode, mouse::Button, mouse::Event as MouseEvent
 };
 use iced_native::layout::Limits;
-use iced_native::{Event, Renderer};
+use iced_native::{Event, Renderer, Rectangle};
 use std::io::Write;
 use terminal::{Action, Attribute, Clear, Retrieved, Terminal, Value};
 
@@ -25,7 +26,7 @@ use terminal::{Action, Attribute, Clear, Retrieved, Terminal, Value};
 ///
 /// This is a both the shell and the renderer, it is the basic building block of your Iced
 /// Application
-pub struct TerminalRenderer<W: Write> {
+pub struct TerminalRenderer<W: Write = std::io::Stdout> {
     /// Terminal window to use to print UI elements
     terminal: Terminal<W>,
     /// Terminal refresh delay, allows any terminal app to be non-blocking
@@ -61,9 +62,12 @@ impl TerminalRenderer<std::io::Stdout> {
 impl<W: Write> Renderer for TerminalRenderer<W> {
     type Output = Primitive;
 
+    type Defaults = ();
+
     fn layout<'a, Message>(
         &mut self,
         element: &iced_native::Element<'a, Message, Self>,
+        limits: &Limits,
     ) -> iced_native::layout::Node {
         let abc = self
             .terminal
@@ -71,11 +75,21 @@ impl<W: Write> Renderer for TerminalRenderer<W> {
             .expect("Failed to read terminal size");
         match abc {
             Retrieved::TerminalSize(x, y) => {
-                let limits = Limits::NONE.max_width(x as u32).max_height(y as u32);
-                element.layout(self, &limits)
+                let new_limits = limits.max_width(x as u32).max_height(y as u32);
+                element.layout(self, &new_limits)
             }
             _ => unreachable!(),
         }
+    }
+
+    fn overlay(
+        &mut self,
+        base: Self::Output,
+        overlay: Self::Output,
+        overlay_bounds: Rectangle,
+    ) -> Self::Output
+    {
+        Primitive::Group(vec![base, overlay])
     }
 }
 
@@ -85,7 +99,6 @@ impl<W: Write> TerminalRenderer<W> {
         let input = self.terminal.get(Value::Event(None))?;
         match input {
             Retrieved::Event(Some(terminal::Event::Key(ke))) => Ok(None),
-            Retrieved::Event(Some(terminal::Event::Key(KeyEvent {}))) => Ok(None),
             /*
             (Input::Character(c)) => {
                 Some(vec![Event::Keyboard(keyboard::Event::CharacterReceived(c))])
@@ -206,7 +219,7 @@ impl<W: Write> TerminalRenderer<W> {
     }
 
     /// Draws a given primitive onto the window
-    pub fn draw(&mut self, primitive: Primitive) -> terminal::error::Result<()> {
+    pub fn draw(&mut self, primitive: Primitive) -> crate::Result {
         match primitive {
             Primitive::Group(prims) => prims
                 .into_iter()
