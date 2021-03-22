@@ -1,5 +1,5 @@
 use crate::TerminalRenderer;
-use iced_native::{Cache, Container, Element, Length, UserInterface};
+use iced_native::{Cache, Container, Element, Length, UserInterface, Point, Size};
 use std::io::Stdout;
 
 pub trait Sandbox: Sized {
@@ -14,7 +14,7 @@ pub trait Sandbox: Sized {
     ///
     /// This function should define the update logic.
     /// All messages produced by user interaction will be handled here.
-    fn update(&mut self, messages: Vec<Self::Message>);
+    fn update(&mut self, message: Self::Message);
 
     /// Request drawing the new state of the UI
     ///
@@ -27,7 +27,7 @@ pub trait Sandbox: Sized {
     /// your program.
     ///
     /// TODO: Should support custom Writer
-    fn run() -> terminal::error::Result<()>
+    fn run() -> crate::Result
     where
         Self: 'static,
     {
@@ -36,32 +36,36 @@ pub trait Sandbox: Sized {
         let mut state = Self::new();
 
         let mut cache = Some(Cache::default());
+        let cursor_position = Point::default();
+
+        let mut messages = Vec::new();
 
         loop {
             renderer.clear();
             let size = renderer.size();
+            let bounds = Size::new(size.0 as f32, size.1 as f32);
             // Consumes the cache and renders the UI to primitives
             let view: Element<'_, Self::Message, TerminalRenderer<Stdout>> =
                 Container::new(state.view())
                     .width(Length::Units(size.0))
                     .height(Length::Units(size.1))
                     .into();
-            let mut ui = UserInterface::build(view, cache.take().unwrap(), &mut renderer);
+            let mut ui = UserInterface::build(view, bounds, cache.take().unwrap(), &mut renderer);
 
             // Displays the new state of the sandbox using the renderer
-            let primitives = ui.draw(&mut renderer);
+            let primitives = ui.draw(&mut renderer, cursor_position);
             renderer.draw(primitives);
 
             // Polls pancurses events and apply them on the ui
-            let messages = renderer
+            renderer
                 .handle()?
-                .map(|event| ui.update(&renderer, None, vec![event].into_iter()));
+                .map(|event| ui.update(&[event], cursor_position, None, &renderer, &mut messages));
 
             // Stores back the cache
             cache = Some(ui.into_cache());
 
             // Applies updates on the state with given messages if any
-            if let Some(message) = messages {
+            for message in messages.drain(..) {
                 state.update(message);
             }
         }

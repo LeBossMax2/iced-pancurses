@@ -12,3 +12,5 @@ mod sandbox;
 //pub use application::Application;
 pub use renderer::TerminalRenderer;
 pub use sandbox::Sandbox;
+
+pub type Result<T = ()> = terminal::error::Result<T>;

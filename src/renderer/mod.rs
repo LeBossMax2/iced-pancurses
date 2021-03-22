@@ -47,7 +47,7 @@ impl Default for TerminalRenderer<std::io::Stdout> {
 }
 
 impl TerminalRenderer<std::io::Stdout> {
-    pub fn new() -> terminal::error::Result<Self> {
+    pub fn new() -> crate::Result<Self> {
         let mut renderer = TerminalRenderer {
             terminal: terminal::stdout(),
             refresh_delay: None,
@@ -95,7 +95,7 @@ impl<W: Write> Renderer for TerminalRenderer<W> {
 
 impl<W: Write> TerminalRenderer<W> {
     /// Polls event from the terminal window
-    pub fn handle(&self) -> terminal::error::Result<Option<Event>> {
+    pub fn handle(&self) -> crate::Result<Option<Event>> {
         let input = self.terminal.get(Value::Event(None))?;
         match input {
             Retrieved::Event(Some(terminal::Event::Key(ke))) => Ok(None),
@@ -195,11 +195,11 @@ impl<W: Write> TerminalRenderer<W> {
         }
     }
 
-    pub fn clear(&mut self) -> terminal::error::Result<()> {
+    pub fn clear(&mut self) -> crate::Result<()> {
         self.terminal.act(Action::ClearTerminal(Clear::All))
     }
 
-    pub fn setup_terminal(&mut self) -> terminal::error::Result<()> {
+    pub fn setup_terminal(&mut self) -> crate::Result<()> {
         // Resets terminal state
         self.terminal.act(Action::SetAttribute(Attribute::Reset))?;
         self.terminal.act(Action::ClearTerminal(Clear::All))?;
@@ -224,7 +224,7 @@ impl<W: Write> TerminalRenderer<W> {
             Primitive::Group(prims) => prims
                 .into_iter()
                 .map(|p| self.draw(p))
-                .collect::<terminal::error::Result<()>>(),
+                .collect::<crate::Result<()>>(),
             Primitive::Text(texts, bounds, color) => {
                 //let col = crate::colors::get_closest_color(color);
                 //let col_idx = self.color_registry.get_idx(PancursesColor::new(col, -1));
@@ -242,7 +242,7 @@ impl<W: Write> TerminalRenderer<W> {
                         y += 1;
                         Ok(())
                     })
-                    .collect::<terminal::error::Result<()>>()
+                    .collect::<crate::Result<()>>()
             }
             Primitive::BoxDisplay(bounds) => {
                 Ok(())
