@@ -15,12 +15,17 @@ mod text_input;
 use crate::primitive::Primitive;
 use core::time::Duration;
 use iced_native::{
-    keyboard::KeyCode, mouse::Button, mouse::Event as MouseEvent
+    keyboard, keyboard::KeyCode as IcedKeyCode,
+    mouse::Button, mouse::Event as IcedMouseEvent, mouse::ScrollDelta,
+    window::Event as WindowEvent
 };
 use iced_native::layout::Limits;
 use iced_native::{Event, Renderer, Rectangle};
 use std::io::Write;
-use terminal::{Action, Attribute, Clear, Retrieved, Terminal, Value};
+use terminal::{
+    Action, Attribute, Clear, Retrieved, Terminal, Value, Color,
+    KeyCode as TermKeyCode, MouseEvent as TermMouseEvent, MouseButton
+};
 
 /// Terminal Renderer implementation for Iced
 ///
@@ -86,130 +91,164 @@ impl<W: Write> Renderer for TerminalRenderer<W> {
         &mut self,
         base: Self::Output,
         overlay: Self::Output,
-        overlay_bounds: Rectangle,
+        _overlay_bounds: Rectangle,
     ) -> Self::Output
     {
         Primitive::Group(vec![base, overlay])
     }
 }
 
+fn convert_button(button: MouseButton) -> Button
+{
+    match button {
+        MouseButton::Left => Button::Left,
+        MouseButton::Right => Button::Right,
+        MouseButton::Middle => Button::Middle,
+        MouseButton::Unknown => Button::Other(4)
+    }
+}
+
+fn move_cursor_and(x: u16, y: u16, other: Event) -> Vec<Event>
+{
+    vec![
+        Event::Mouse(IcedMouseEvent::CursorMoved { x: x as f32, y: y as f32 }),
+        other
+    ]
+}
+
+fn convert_modifiers(modifiers: terminal::KeyModifiers) -> keyboard::Modifiers
+{
+    keyboard::Modifiers {
+        shift: modifiers.contains(terminal::KeyModifiers::SHIFT),
+        control: modifiers.contains(terminal::KeyModifiers::CONTROL),
+        alt: modifiers.contains(terminal::KeyModifiers::ALT),
+        logo: false
+    }
+}
+
+fn press_and_release(key_code: IcedKeyCode, modifiers: terminal::KeyModifiers) -> Vec<Event>
+{
+    let modifiers = convert_modifiers(modifiers);
+    vec![
+        Event::Keyboard(keyboard::Event::KeyPressed {
+            key_code,
+            modifiers
+        }),
+        Event::Keyboard(keyboard::Event::KeyReleased {
+            key_code,
+            modifiers
+        })
+    ]
+}
+
 impl<W: Write> TerminalRenderer<W> {
     /// Polls event from the terminal window
-    pub fn handle(&self) -> crate::Result<Option<Event>> {
-        let input = self.terminal.get(Value::Event(None))?;
-        match input {
-            Retrieved::Event(Some(terminal::Event::Key(ke))) => Ok(None),
+    pub fn handle(&self) -> crate::Result<Vec<Event>> {
+        let input = self.terminal.get(Value::Event(self.refresh_delay))?;
+        Ok(match input {
+            Retrieved::Event(Some(terminal::Event::Key(ke))) =>
+            {
+                Self::handle_key(ke)
+            },
+            Retrieved::Event(Some(terminal::Event::Mouse(me))) =>
+            {
+                Self::handle_mouse(me)
+            },
+            Retrieved::Event(Some(terminal::Event::Resize)) =>
+            {
+                let size = self.size();
+                vec![Event::Window(WindowEvent::Resized { width: size.0 as u32, height: size.1 as u32 })]
+            },
             /*
-            (Input::Character(c)) => {
-                Some(vec![Event::Keyboard(keyboard::Event::CharacterReceived(c))])
-            }::Event()
             Some(Input::KeyResize) => {
                 self.flush();
                 None
             }
-            Some(Input::KeyBackspace) => Some(vec![
-                Event::Keyboard(keyboard::Event::Input {
-                    state: ButtonState::Pressed,
-                    key_code: KeyCode::Backspace,
-                    modifiers: keyboard::ModifiersState {
-                        shift: false,
-                        control: false,
-                        alt: false,
-                        logo: false,
-                    },
-                }),
-                Event::Keyboard(keyboard::Event::Input {
-                    state: ButtonState::Released,
-                    key_code: KeyCode::Backspace,
-                    modifiers: keyboard::ModifiersState {
-                        shift: false,
-                        control: false,
-                        alt: false,
-                        logo: false,
-                    },
-                }),
-            ]),
-            Some(Input::KeyEnter) => Some(vec![
-                Event::Keyboard(keyboard::Event::Input {
-                    state: ButtonState::Pressed,
-                    key_code: KeyCode::Enter,
-                    modifiers: keyboard::ModifiersState {
-                        shift: false,
-                        control: false,
-                        alt: false,
-                        logo: false,
-                    },
-                }),
-                Event::Keyboard(keyboard::Event::Input {
-                    state: ButtonState::Released,
-                    key_code: KeyCode::Enter,
-                    modifiers: keyboard::ModifiersState {
-                        shift: false,
-                        control: false,
-                        alt: false,
-                        logo: false,
-                    },
-                }),
-            ]),
-            Some(Input::KeyMouse) => {
-                if let Ok(mouse_event) = pancurses::getmouse() {
-                    match mouse_event.bstate {
-                        pancurses::BUTTON1_PRESSED => Some(move_cursor_and(
-                            mouse_event.x,
-                            mouse_event.y,
-                            vec![Event::Mouse(MouseEvent::Input {
-                                state: ButtonState::Pressed,
-                                button: Button::Left,
-                            })],
-                        )),
-                        pancurses::BUTTON1_RELEASED => Some(move_cursor_and(
-                            mouse_event.x,
-                            mouse_event.y,
-                            vec![Event::Mouse(MouseEvent::Input {
-                                state: ButtonState::Released,
-                                button: Button::Left,
-                            })],
-                        )),
-                        pancurses::BUTTON1_CLICKED => Some(move_cursor_and(
-                            mouse_event.x,
-                            mouse_event.y,
-                            vec![
-                                Event::Mouse(MouseEvent::Input {
-                                    state: ButtonState::Pressed,
-                                    button: Button::Left,
-                                }),
-                                Event::Mouse(MouseEvent::Input {
-                                    state: ButtonState::Released,
-                                    button: Button::Left,
-                                }),
-                            ],
-                        )),
-                        _ => None,
-                    }
-                } else {
-                    None
-                }
-            }
             */
-            _ => Ok(None),
+            _ => vec![],
+        })
+    }
+    
+    fn handle_key(event: terminal::KeyEvent) -> Vec<Event> {
+        match event.code
+        {
+            TermKeyCode::Char(ch) => vec![Event::Keyboard(keyboard::Event::CharacterReceived(ch))],
+            TermKeyCode::Backspace => press_and_release(IcedKeyCode::Backspace, event.modifiers),
+            TermKeyCode::Enter => press_and_release(IcedKeyCode::Enter, event.modifiers),
+            TermKeyCode::Left => press_and_release(IcedKeyCode::Left, event.modifiers),
+            TermKeyCode::Right => press_and_release(IcedKeyCode::Right, event.modifiers),
+            TermKeyCode::Up => press_and_release(IcedKeyCode::Up, event.modifiers),
+            TermKeyCode::End => press_and_release(IcedKeyCode::End, event.modifiers),
+            TermKeyCode::PageUp => press_and_release(IcedKeyCode::PageUp, event.modifiers),
+            TermKeyCode::PageDown => press_and_release(IcedKeyCode::PageDown, event.modifiers),
+            TermKeyCode::Tab => press_and_release(IcedKeyCode::Tab, event.modifiers),
+            TermKeyCode::BackTab => press_and_release(IcedKeyCode::Tab, event.modifiers | terminal::KeyModifiers::SHIFT), // backtab = shift + tab
+            TermKeyCode::Delete => press_and_release(IcedKeyCode::Delete, event.modifiers),
+            TermKeyCode::Insert => press_and_release(IcedKeyCode::Insert, event.modifiers),
+            TermKeyCode::Esc => press_and_release(IcedKeyCode::Escape, event.modifiers),
+            TermKeyCode::F(1) => press_and_release(IcedKeyCode::F1, event.modifiers),
+            TermKeyCode::F(2) => press_and_release(IcedKeyCode::F2, event.modifiers),
+            TermKeyCode::F(3) => press_and_release(IcedKeyCode::F3, event.modifiers),
+            TermKeyCode::F(4) => press_and_release(IcedKeyCode::F4, event.modifiers),
+            TermKeyCode::F(5) => press_and_release(IcedKeyCode::F5, event.modifiers),
+            TermKeyCode::F(6) => press_and_release(IcedKeyCode::F6, event.modifiers),
+            TermKeyCode::F(7) => press_and_release(IcedKeyCode::F7, event.modifiers),
+            TermKeyCode::F(8) => press_and_release(IcedKeyCode::F8, event.modifiers),
+            TermKeyCode::F(9) => press_and_release(IcedKeyCode::F9, event.modifiers),
+            TermKeyCode::F(10) => press_and_release(IcedKeyCode::F10, event.modifiers),
+            TermKeyCode::F(11) => press_and_release(IcedKeyCode::F11, event.modifiers),
+            TermKeyCode::F(12) => press_and_release(IcedKeyCode::F12, event.modifiers),
+            TermKeyCode::F(13) => press_and_release(IcedKeyCode::F13, event.modifiers),
+            TermKeyCode::F(14) => press_and_release(IcedKeyCode::F14, event.modifiers),
+            TermKeyCode::F(15) => press_and_release(IcedKeyCode::F15, event.modifiers),
+            TermKeyCode::F(16) => press_and_release(IcedKeyCode::F16, event.modifiers),
+            TermKeyCode::F(17) => press_and_release(IcedKeyCode::F17, event.modifiers),
+            TermKeyCode::F(18) => press_and_release(IcedKeyCode::F18, event.modifiers),
+            TermKeyCode::F(19) => press_and_release(IcedKeyCode::F19, event.modifiers),
+            TermKeyCode::F(20) => press_and_release(IcedKeyCode::F20, event.modifiers),
+            TermKeyCode::F(21) => press_and_release(IcedKeyCode::F21, event.modifiers),
+            TermKeyCode::F(22) => press_and_release(IcedKeyCode::F22, event.modifiers),
+            TermKeyCode::F(23) => press_and_release(IcedKeyCode::F23, event.modifiers),
+            TermKeyCode::F(24) => press_and_release(IcedKeyCode::F24, event.modifiers),
+            _ => vec![]
         }
     }
 
-    pub fn clear(&mut self) -> crate::Result<()> {
+    fn handle_mouse(event: TermMouseEvent) -> Vec<Event> {
+        match event {
+            TermMouseEvent::Down(button, x, y, _modifier) =>
+                move_cursor_and(x, y,
+                    Event::Mouse(IcedMouseEvent::ButtonPressed(convert_button(button)))),
+            TermMouseEvent::Up(button, x, y, _modifier) =>
+                move_cursor_and(x, y,
+                    Event::Mouse(IcedMouseEvent::ButtonPressed(convert_button(button)))),
+            TermMouseEvent::ScrollDown(x, y, _modifier) =>
+                move_cursor_and(x, y,
+                    Event::Mouse(IcedMouseEvent::WheelScrolled { delta: ScrollDelta::Lines { x: 0.0, y: -1.0 } })),
+            TermMouseEvent::ScrollUp(x, y, _modifier) =>
+                move_cursor_and(x, y,
+                    Event::Mouse(IcedMouseEvent::WheelScrolled { delta: ScrollDelta::Lines { x: 0.0, y: 1.0 } })),
+            _ => vec![]
+        }
+    }
+
+    pub fn clear(&mut self) -> crate::Result {
         self.terminal.act(Action::ClearTerminal(Clear::All))
     }
 
-    pub fn setup_terminal(&mut self) -> crate::Result<()> {
+    pub fn setup_terminal(&mut self) -> crate::Result {
         // Resets terminal state
-        self.terminal.act(Action::SetAttribute(Attribute::Reset))?;
-        self.terminal.act(Action::ClearTerminal(Clear::All))?;
+        self.terminal.batch(Action::SetAttribute(Attribute::Reset))?;
+        self.terminal.batch(Action::ClearTerminal(Clear::All))?;
 
         // Sets up various data for correct terminal processing
-        self.terminal.act(Action::ResetColor)?;
-        self.terminal.act(Action::HideCursor)?;
-        self.terminal.act(Action::DisableBlinking)?;
-        self.terminal.act(Action::EnableRawMode)?;
-        self.terminal.act(Action::EnableMouseCapture)
+        self.terminal.batch(Action::EnableRawMode)?;
+        self.terminal.batch(Action::EnterAlternateScreen)?;
+        self.terminal.batch(Action::EnableMouseCapture)?;
+        self.terminal.batch(Action::HideCursor)?;
+        self.terminal.batch(Action::DisableBlinking)?;
+        self.flush()?;
+        Ok(())
     }
 
     // Sets nodelay to true in order to provide async actions
@@ -220,21 +259,24 @@ impl<W: Write> TerminalRenderer<W> {
 
     /// Draws a given primitive onto the window
     pub fn draw(&mut self, primitive: Primitive) -> crate::Result {
+        self.draw_batch(primitive)?;
+        self.flush()?;
+        Ok(())
+    }
+    
+    fn draw_batch(&mut self, primitive: Primitive) -> crate::Result {
         match primitive {
             Primitive::Group(prims) => prims
                 .into_iter()
                 .map(|p| self.draw(p))
-                .collect::<crate::Result<()>>(),
+                .collect::<crate::Result>(),
             Primitive::Text(texts, bounds, color) => {
-                //let col = crate::colors::get_closest_color(color);
-                //let col_idx = self.color_registry.get_idx(PancursesColor::new(col, -1));
-                //self.window
-                //    .attrset(pancurses::COLOR_PAIR((col_idx as u32).into()));
+                self.terminal.batch(Action::SetForegroundColor(Color::Rgb((color.r * 255.0) as u8, (color.g * 255.0) as u8, (color.b * 255.0) as u8)))?;
                 let mut y = 0;
                 texts
                     .into_iter()
                     .map(|l| {
-                        self.terminal.act(Action::MoveCursorTo(
+                        self.terminal.batch(Action::MoveCursorTo(
                             bounds.x as u16,
                             bounds.y as u16 + y as u16,
                         ))?;
@@ -242,39 +284,38 @@ impl<W: Write> TerminalRenderer<W> {
                         y += 1;
                         Ok(())
                     })
-                    .collect::<crate::Result<()>>()
+                    .collect::<crate::Result>()
             }
             Primitive::BoxDisplay(bounds) => {
-                Ok(())
-                /*
-                let col_idx = self
-                    .color_registry
-                    .get_idx(PancursesColor::new(pancurses::COLOR_WHITE, -1));
-                self.window
-                    .attrset(pancurses::COLOR_PAIR((col_idx as u32).into()));
-                let x = bounds.x as i32;
-                let y = bounds.y as i32;
-                let w = bounds.width as i32;
-                let h = bounds.height as i32;
-                if let Ok(sub_win) = self.window.subwin(h, w, y, x) {
-                    sub_win.border(0, 0, 0, 0, 0, 0, 0, 0);
-                    sub_win.delwin();
+                self.terminal.batch(Action::SetBackgroundColor(Color::DarkGrey))?;
+                for y in bounds.y as u32..(bounds.y + bounds.height) as u32
+                {
+                    self.terminal.batch(Action::MoveCursorTo(
+                        bounds.x as u16,
+                        y as u16,
+                    ))?;
+                    for _x in bounds.x as u32..(bounds.x + bounds.width) as u32
+                    {
+                        self.terminal.write(" ".as_bytes())?;
+                    }
                 }
-                */
+                self.terminal.batch(Action::SetBackgroundColor(Color::Reset))?;
+                Ok(())
             }
             Primitive::Char(x, y, c) => {
-                //let col_idx = self
-                //    .color_registry
-                //    .get_idx(PancursesColor::new(pancurses::COLOR_WHITE, -1));
-                //self.window
-                //    .attrset(pancurses::COLOR_PAIR((col_idx as u32).into()));
+                self.terminal.batch(Action::SetForegroundColor(Color::White))?;
                 self.terminal
-                    .act(Action::MoveCursorTo(x as u16, y as u16))?;
+                    .batch(Action::MoveCursorTo(x as u16, y as u16))?;
                 self.terminal.write(format!("{}", c).as_bytes())?;
                 Ok(())
             }
             _ => Ok(()),
         }
+    }
+
+    pub fn flush(&self) -> crate::Result
+    {
+        self.terminal.flush_batch()
     }
 
     /// Gets the current size of the terminal root window

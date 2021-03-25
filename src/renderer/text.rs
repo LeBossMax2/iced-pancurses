@@ -21,7 +21,7 @@ impl<W: std::io::Write> text::Renderer for TerminalRenderer<W> {
 
     fn draw(
         &mut self,
-        defaults: &Self::Defaults,
+        _defaults: &Self::Defaults,
         bounds: Rectangle,
         content: &str,
         _size: u16,

@@ -1,11 +1,11 @@
 use std::collections::{VecDeque, HashMap, HashSet};
 use std::hash::Hasher;
 use std::sync::{Arc, Mutex};
-use iced_native::{Event, Hasher as IcedHasher, Subscription};
+use iced_native::{Event, event::Status, Hasher as IcedHasher, Subscription};
 
 struct Handle {
     _cancel: futures::channel::oneshot::Sender<()>,
-    sender: Option<futures::channel::mpsc::Sender<Event>>,
+    sender: Option<futures::channel::mpsc::Sender<(Event, Status)>>,
 }
 
 #[derive(Default)]
@@ -48,19 +48,19 @@ impl SubscriptionPool {
                     hashed, 
                     Handle {
                         _cancel: cancel,
-                        sender: if tx.is_closed() { None} else { Some (tx) }, 
+                        sender: if tx.is_closed() { None } else { Some (tx) }, 
                     }
                 );
             }
         }
     }
 
-    pub fn broadcast(&mut self, event: Event) {
+    pub fn broadcast(&mut self, event: Event, status: Status) {
         self.alive
             .values_mut()
             .filter_map(|connection| connection.sender.as_mut())
             .for_each(|listener| {
-                if let Err(error) = listener.try_send(event) {
+                if let Err(error) = listener.try_send((event.clone(), status.clone())) {
                     panic!("Failed to communicate with sender {}", error);
                 }
             });

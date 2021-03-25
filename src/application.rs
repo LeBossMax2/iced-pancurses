@@ -1,7 +1,7 @@
-use crate::subscription::SubscriptionPool;
 use crate::TerminalRenderer;
-use iced_core::Command;
-use iced_native::{Cache, Container, Element, Length, Subscription, UserInterface};
+use crate::subscription::SubscriptionPool;
+use iced_native::Command;
+use iced_native::{Cache, Element, Subscription, UserInterface, Size, Point};
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -50,12 +50,12 @@ pub trait Application: Sized {
     /// This method will take ownership of the current thread, and will NOT return.
     ///
     /// This should probably be the last thing you would call at the end of the entrypoint of your program.
-    fn run()
+    fn run() -> crate::Result
     where
         Self: 'static,
     {
         // Creates the renderer and the default state
-        let mut renderer = TerminalRenderer::default().nodelay();
+        let mut renderer = TerminalRenderer::default();//.nodelay();
         let (mut state, command) = Self::new();
         let mut cache = Some(Cache::default());
 
@@ -70,30 +70,35 @@ pub trait Application: Sized {
 
         spawn_command(command, &mut thread_pool, event_queue.clone());
 
+        let mut cursor_position = Point::new(-1.0, -1.0); // Cursor available
+
         loop {
             let size = renderer.size();
+            let bounds = Size::new(size.0 as f32, size.1 as f32);
             subscription_pool.update(state.subscription(), &mut thread_pool, event_queue.clone());
             // Consumes the cache and renders the UI to primitives
-            let view: Element<'_, Self::Message, TerminalRenderer> = Container::new(state.view())
-                .width(Length::Units(size.0))
-                .height(Length::Units(size.1))
-                .into();
-            let mut ui = UserInterface::build(view, cache.take().unwrap(), &mut renderer);
+            let mut ui = UserInterface::build(state.view(), bounds, cache.take().unwrap(), &mut renderer);
 
             // Displays the new state of the sandbox using the renderer
-            let primitives = ui.draw(&mut renderer);
-            renderer.draw(primitives);
+            let primitives = ui.draw(&mut renderer, cursor_position);
+            renderer.draw(primitives)?;
 
             // Polls pancurses events and apply them on the ui, generating Application::Messages
-            let mut messages = renderer
-                .handle()
-                .map(|events| {
-                    events.iter().for_each(|e| subscription_pool.broadcast(*e));
-                    ui.update(&renderer, None, events.into_iter())
-                })
-                .unwrap_or(vec![]);
-            if messages.len() != 0 {
-                renderer.flush();
+            let mut messages = Vec::new();
+            let events = renderer.handle()?;
+            if !events.is_empty() {
+                for event in &events {
+                    if let iced_native::Event::Mouse(iced_native::mouse::Event::CursorMoved { x, y }) = *event {
+                        cursor_position = Point::new(x, y);
+                    }
+                }
+
+                let statuses = ui.update(&events, cursor_position, None, &renderer, &mut messages);
+                events.into_iter().zip(statuses).for_each(|(e, s)| subscription_pool.broadcast(e, s));
+                    
+                if !messages.is_empty() {
+                    renderer.flush()?;
+                }
             }
 
             // Polls Application::Messages from the Receiver
@@ -106,7 +111,7 @@ pub trait Application: Sized {
             // Stores back the cache
             cache = Some(ui.into_cache());
 
-            if messages.len() != 0 {
+            if !messages.is_empty() {
                 // Applies updates on the state with given messages if any.
                 // Launching update can generate Commands, so we spawn their futures so as to resolve them.
                 let commands = state.update(messages);

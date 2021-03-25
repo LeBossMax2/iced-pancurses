@@ -10,10 +10,13 @@ impl<W: std::io::Write> container::Renderer for TerminalRenderer<W> {
         bounds: Rectangle,
         cursor_position: Point,
         viewport: &Rectangle,
-        style: &Self::Style,
+        _style: &Self::Style,
         content: &Element<'_, Message, Self>,
         content_layout: Layout<'_>,
     ) -> Self::Output {
-        content.draw(self, defaults, content_layout, cursor_position, viewport)
+        Primitive::Group(vec![
+            Primitive::BoxDisplay(bounds),
+            content.draw(self, defaults, content_layout, cursor_position, viewport)
+        ])
     }
 }

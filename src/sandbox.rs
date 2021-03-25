@@ -1,5 +1,5 @@
 use crate::TerminalRenderer;
-use iced_native::{Cache, Container, Element, Length, UserInterface, Point, Size};
+use iced_native::{Event, Cache, Element, UserInterface, Point, Size};
 use std::io::Stdout;
 
 pub trait Sandbox: Sized {
@@ -36,30 +36,35 @@ pub trait Sandbox: Sized {
         let mut state = Self::new();
 
         let mut cache = Some(Cache::default());
-        let cursor_position = Point::default();
+        let mut cursor_position = Point::new(-1.0, -1.0); // Cursor available
 
         let mut messages = Vec::new();
 
         loop {
-            renderer.clear();
+            renderer.clear()?;
             let size = renderer.size();
             let bounds = Size::new(size.0 as f32, size.1 as f32);
             // Consumes the cache and renders the UI to primitives
-            let view: Element<'_, Self::Message, TerminalRenderer<Stdout>> =
-                Container::new(state.view())
-                    .width(Length::Units(size.0))
-                    .height(Length::Units(size.1))
-                    .into();
-            let mut ui = UserInterface::build(view, bounds, cache.take().unwrap(), &mut renderer);
+            let mut ui = UserInterface::build(state.view(), bounds, cache.take().unwrap(), &mut renderer);
 
             // Displays the new state of the sandbox using the renderer
             let primitives = ui.draw(&mut renderer, cursor_position);
-            renderer.draw(primitives);
+            renderer.draw(primitives)?;
 
             // Polls pancurses events and apply them on the ui
-            renderer
-                .handle()?
-                .map(|event| ui.update(&[event], cursor_position, None, &renderer, &mut messages));
+            let events = renderer.handle()?;
+            if !events.is_empty() {
+                for event in &events {
+                    if let Event::Mouse(iced_native::mouse::Event::CursorMoved { x, y }) = *event {
+                        cursor_position = Point::new(x, y);
+                    }
+                }
+                ui.update(&events, cursor_position, None, &renderer, &mut messages);
+            
+                if !messages.is_empty() {
+                    renderer.flush()?;
+                }
+            }
 
             // Stores back the cache
             cache = Some(ui.into_cache());

@@ -5,12 +5,12 @@ use iced_native::{Layout, Color, Point, Widget, Rectangle};
 impl Debugger for TerminalRenderer {
     fn explain<Message>(
         &mut self,
-        defaults: &Self::Defaults,
-        widget: &dyn Widget<Message, Self>,
+        _defaults: &Self::Defaults,
+        _widget: &dyn Widget<Message, Self>,
         layout: Layout<'_>,
-        cursor_position: Point,
-        viewport: &Rectangle,
-        color: Color,
+        _cursor_position: Point,
+        _viewport: &Rectangle,
+        _color: Color,
     ) -> Self::Output {
         Primitive::BoxDisplay(layout.bounds())
         /*let bounds = layout.bounds();

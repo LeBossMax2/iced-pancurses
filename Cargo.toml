@@ -13,7 +13,6 @@ keywords= ["gui", "iced", "pancurses", "ncurses", "tui"]
 
 [dependencies]
 futures = { version = "0.3", features = ["thread-pool"] }
-iced_core = "0.3.0"
 iced_native = "0.3.0"
 terminal = "0.2.1"
 

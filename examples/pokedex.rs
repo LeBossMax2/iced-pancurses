@@ -4,7 +4,7 @@ use iced_native::{
 };
 use iced_pancurses::{Application, TerminalRenderer};
 
-pub fn main() {
+pub fn main() -> iced_pancurses::Result {
     Pokedex::run()
 }
 
@@ -213,6 +213,6 @@ impl From<surf::Exception> for Error {
 
 fn button<'a>(state: &'a mut button::State, text: &str) -> Button<'a, Message, TerminalRenderer> {
     Button::new(state, Text::new(text).color(Color::WHITE))
-        .background(Color::from_rgb(0.11, 0.42, 0.87))
+        //.background(Color::from_rgb(0.11, 0.42, 0.87))
         .padding(1)
 }

@@ -6,7 +6,7 @@ use iced_native::{
 use iced_pancurses::{Application, TerminalRenderer};
 use std::time::{Duration, Instant};
 
-pub fn main() {
+pub fn main() -> iced_pancurses::Result {
     Stopwatch::run()
 }
 
@@ -102,7 +102,7 @@ impl Application for Stopwatch {
                     .horizontal_alignment(HorizontalAlignment::Center),
             )
             .min_width(10)
-            .background(Background::Color(color.into()))
+            //.background(Background::Color(color.into()))
             .padding(1)
         };
 
@@ -161,7 +161,7 @@ mod time {
             self.0.hash(state);
         }
 
-        fn stream(self: Box<Self>, _input: I) -> futures::stream::BoxStream<'static, Self::Output> {
+        fn stream(self: Box<Self>, _input: futures::stream::BoxStream<I>) -> futures::stream::BoxStream<'static, Self::Output> {
             use futures::stream::StreamExt;
 
             async_std::stream::interval(self.0)
