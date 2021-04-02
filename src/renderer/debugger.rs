@@ -1,6 +1,7 @@
-use crate::{primitive::Primitive, TerminalRenderer};
+use crate::{primitive::Primitive, primitive::BoxStyle, TerminalRenderer};
 use iced_native::layout::Debugger;
 use iced_native::{Layout, Color, Point, Widget, Rectangle};
+use terminal::Color as TermColor;
 
 impl Debugger for TerminalRenderer {
     fn explain<Message>(
@@ -12,16 +13,16 @@ impl Debugger for TerminalRenderer {
         _viewport: &Rectangle,
         _color: Color,
     ) -> Self::Output {
-        Primitive::BoxDisplay(layout.bounds())
-        /*let bounds = layout.bounds();
-        if let Ok(sub_win) = self.terminal.subwin(
-            bounds.height as i32,
-            bounds.width as i32,
-            bounds.y as i32,
-            bounds.x as i32,
-        ) {
-            sub_win.border(0, 0, 0, 0, 0, 0, 0, 0);
-            sub_win.delwin();
-        }*/
+        let mut primitives = Vec::new();
+        explain_layout(layout, 0, &mut primitives);
+        Primitive::Group(primitives)
+    }
+}
+
+fn explain_layout(layout: Layout<'_>, depth: u8, output: &mut Vec<Primitive>) {
+    let style = BoxStyle::default().with_color(TermColor::AnsiValue(depth));
+    output.push(Primitive::BoxDisplay(layout.bounds().snap(), style));
+    for child in layout.children() {
+        explain_layout(child, depth + 1, output);
     }
 }

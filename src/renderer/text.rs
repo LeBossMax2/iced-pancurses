@@ -1,5 +1,6 @@
 use crate::primitive::Primitive;
 use crate::renderer::TerminalRenderer;
+use crate::conversion;
 
 use iced_native::widget::text;
 use iced_native::{Color, HorizontalAlignment, Rectangle, Size, VerticalAlignment};
@@ -21,7 +22,7 @@ impl<W: std::io::Write> text::Renderer for TerminalRenderer<W> {
 
     fn draw(
         &mut self,
-        _defaults: &Self::Defaults,
+        defaults: &Self::Defaults,
         bounds: Rectangle,
         content: &str,
         _size: u16,
@@ -36,7 +37,9 @@ impl<W: std::io::Write> text::Renderer for TerminalRenderer<W> {
             bounds.height as u32,
             horizontal_alignment,
         );
-        Primitive::Text(wrapped_content, bounds, color.unwrap_or(Color::WHITE))
+        let mut style = defaults.text_style.clone();
+        style.foreground_color = color.map(|c| conversion::color(c)).unwrap_or(style.foreground_color);
+        Primitive::Text(wrapped_content, bounds.snap(), style)
     }
 }
 

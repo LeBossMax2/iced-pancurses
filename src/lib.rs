@@ -7,6 +7,7 @@ mod primitive;
 mod renderer;
 mod sandbox;
 mod subscription;
+pub mod conversion;
 
 // Conveniently reexports common structs that the user might want to use in their application.
 pub use application::Application;

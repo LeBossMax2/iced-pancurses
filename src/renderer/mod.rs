@@ -12,7 +12,7 @@ mod space;
 mod text;
 mod text_input;
 
-use crate::primitive::Primitive;
+use crate::primitive::{Primitive, BoxStyle, TextStyle, BoxStyleOverride, TextStyleOverride};
 use core::time::Duration;
 use iced_native::{
     keyboard, keyboard::KeyCode as IcedKeyCode,
@@ -67,7 +67,7 @@ impl TerminalRenderer<std::io::Stdout> {
 impl<W: Write> Renderer for TerminalRenderer<W> {
     type Output = Primitive;
 
-    type Defaults = ();
+    type Defaults = DefaultStyling;
 
     fn layout<'a, Message>(
         &mut self,
@@ -268,10 +268,11 @@ impl<W: Write> TerminalRenderer<W> {
         match primitive {
             Primitive::Group(prims) => prims
                 .into_iter()
-                .map(|p| self.draw(p))
+                .map(|p| self.draw_batch(p))
                 .collect::<crate::Result>(),
-            Primitive::Text(texts, bounds, color) => {
-                self.terminal.batch(Action::SetForegroundColor(Color::Rgb((color.r * 255.0) as u8, (color.g * 255.0) as u8, (color.b * 255.0) as u8)))?;
+            Primitive::Text(texts, bounds, style) => {
+                self.terminal.batch(Action::SetBackgroundColor(style.background_color))?;
+                self.terminal.batch(Action::SetForegroundColor(style.foreground_color))?;
                 let mut y = 0;
                 texts
                     .into_iter()
@@ -286,24 +287,27 @@ impl<W: Write> TerminalRenderer<W> {
                     })
                     .collect::<crate::Result>()
             }
-            Primitive::BoxDisplay(bounds) => {
-                self.terminal.batch(Action::SetBackgroundColor(Color::DarkGrey))?;
+            Primitive::BoxDisplay(bounds, style) => {
+                self.terminal.batch(Action::SetBackgroundColor(style.background_color))?;
                 for y in bounds.y as u32..(bounds.y + bounds.height) as u32
                 {
                     self.terminal.batch(Action::MoveCursorTo(
                         bounds.x as u16,
                         y as u16,
                     ))?;
-                    for _x in bounds.x as u32..(bounds.x + bounds.width) as u32
+                    let y_index = (y - bounds.y + bounds.height - 3) / (bounds.height - 2);
+                    for x in bounds.x as u32..(bounds.x + bounds.width) as u32
                     {
-                        self.terminal.write(" ".as_bytes())?;
+                        let x_index = (x - bounds.x + bounds.width - 3) / (bounds.width - 2);
+                        write!(self.terminal, "{}", style.border.0[y_index as usize][x_index as usize])?;
                     }
                 }
                 self.terminal.batch(Action::SetBackgroundColor(Color::Reset))?;
                 Ok(())
             }
-            Primitive::Char(x, y, c) => {
-                self.terminal.batch(Action::SetForegroundColor(Color::White))?;
+            Primitive::Char(x, y, c, style) => {
+                self.terminal.batch(Action::SetBackgroundColor(style.background_color))?;
+                self.terminal.batch(Action::SetForegroundColor(style.foreground_color))?;
                 self.terminal
                     .batch(Action::MoveCursorTo(x as u16, y as u16))?;
                 self.terminal.write(format!("{}", c).as_bytes())?;
@@ -328,5 +332,61 @@ impl<W: Write> TerminalRenderer<W> {
             Retrieved::TerminalSize(x, y) => (x, y),
             _ => unreachable!(),
         }
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct DefaultStyling {
+    pub box_style: BoxStyle,
+    pub text_style: TextStyle
+}
+
+impl DefaultStyling
+{
+    pub fn with_box_style(mut self, style: BoxStyle) -> Self
+    {
+        self.box_style = style;
+        self
+    }
+
+    pub fn with_text_style(mut self, style: TextStyle) -> Self
+    {
+        self.text_style = style;
+        self
+    }
+
+    pub fn apply(&self, other: &DefaultOverride) -> Self
+    {
+        let box_style = self.box_style.apply(&other.box_style);
+        let text_style = self.text_style.apply(&other.text_style);
+        return  Self { box_style, text_style }
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct DefaultOverride {
+    pub box_style: BoxStyleOverride,
+    pub text_style: TextStyleOverride
+}
+
+impl DefaultOverride
+{
+    pub fn with_box_style(mut self, style: BoxStyleOverride) -> Self
+    {
+        self.box_style = style;
+        self
+    }
+
+    pub fn with_text_style(mut self, style: TextStyleOverride) -> Self
+    {
+        self.text_style = style;
+        self
+    }
+
+    pub fn merge(&self, other: &DefaultOverride) -> Self
+    {
+        let box_style = self.box_style.merge(&other.box_style);
+        let text_style = self.text_style.merge(&other.text_style);
+        return  Self { box_style, text_style }
     }
 }

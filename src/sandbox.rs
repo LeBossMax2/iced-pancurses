@@ -41,7 +41,6 @@ pub trait Sandbox: Sized {
         let mut messages = Vec::new();
 
         loop {
-            renderer.clear()?;
             let size = renderer.size();
             let bounds = Size::new(size.0 as f32, size.1 as f32);
             // Consumes the cache and renders the UI to primitives

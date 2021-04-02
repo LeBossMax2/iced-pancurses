@@ -25,6 +25,6 @@ impl image::Renderer for TerminalRenderer {
             HorizontalAlignment::Center,
             VerticalAlignment::Center,
         );
-        Primitive::Group(vec![Primitive::BoxDisplay(layout.bounds()), prim_text])
+        Primitive::Group(vec![Primitive::BoxDisplay(layout.bounds().snap(), Default::default()), prim_text])
     }
 }

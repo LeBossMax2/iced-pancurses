@@ -1,11 +1,16 @@
-use crate::primitive::Primitive;
+use crate::primitive::{Primitive, BoxStyle};
 use crate::TerminalRenderer;
 
 use iced_native::widget::scrollable;
 use iced_native::Rectangle;
 
+#[derive(Default, Clone)]
+pub struct ScrollableStyle {
+    background: BoxStyle
+}
+
 impl scrollable::Renderer for TerminalRenderer {
-    type Style = ();
+    type Style = ScrollableStyle;
 
     fn scrollbar(
         &self,
@@ -28,12 +33,12 @@ impl scrollable::Renderer for TerminalRenderer {
         _is_mouse_over_scrollbar: bool,
         _scrollbar: Option<scrollable::Scrollbar>,
         offset: u32,
-        _style: &Self::Style,
+        style: &Self::Style,
         content: Self::Output,
     ) -> Primitive {
         Primitive::Group(vec![
-            Primitive::BoxDisplay(bounds),
-            content.with_offset(offset as i32),
+            Primitive::BoxDisplay(bounds.snap(), style.background.clone()),
+            content.with_offset(offset),
         ])
     }
 }
