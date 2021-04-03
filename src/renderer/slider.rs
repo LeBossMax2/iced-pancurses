@@ -1,16 +1,11 @@
-use crate::primitive::{Primitive, BoxStyle, TextStyle};
+use crate::primitive::Primitive;
+use crate::style::SliderStyle;
 use crate::TerminalRenderer;
 
 use iced_native::widget::slider;
 use iced_native::{Point, Rectangle};
 
 use std::ops::RangeInclusive;
-
-#[derive(Default, Clone)]
-pub struct SliderStyle {
-    background: BoxStyle,
-    slider: (TextStyle, char)
-}
 
 impl slider::Renderer for TerminalRenderer {
     type Style = SliderStyle;

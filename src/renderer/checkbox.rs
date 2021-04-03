@@ -1,25 +1,9 @@
-use crate::primitive::{Primitive, TextStyle, TextStyleOverride};
+use crate::primitive::Primitive;
+use crate::style::CheckboxStyle;
 use crate::TerminalRenderer;
 
 use iced_native::widget::checkbox::Renderer;
 use iced_native::Rectangle;
-
-#[derive(Clone)]
-pub struct CheckboxStyle {
-    base: TextStyle,
-    checked: (TextStyleOverride, char),
-    unchecked: (TextStyleOverride, char)
-}
-
-impl Default for CheckboxStyle {
-    fn default() -> Self {
-        Self {
-            base: Default::default(),
-            checked: (Default::default(), 'x'),
-            unchecked: (Default::default(), 'o')
-        }
-    }
-}
 
 impl Renderer for TerminalRenderer {
     type Style = CheckboxStyle;

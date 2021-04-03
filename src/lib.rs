@@ -2,11 +2,11 @@
 //! Allows to create TUI application using iced as the GUI framework
 
 mod application;
-//mod colors;
 mod primitive;
 mod renderer;
 mod sandbox;
 mod subscription;
+pub mod style;
 pub mod conversion;
 
 // Conveniently reexports common structs that the user might want to use in their application.

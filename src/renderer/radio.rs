@@ -1,24 +1,8 @@
-use crate::primitive::{Primitive, TextStyle, TextStyleOverride};
+use crate::primitive::Primitive;
+use crate::style::RadioStyle;
 use crate::TerminalRenderer;
 use iced_native::widget::radio::Renderer;
 use iced_native::Rectangle;
-
-#[derive(Clone)]
-pub struct RadioStyle {
-    base: TextStyle,
-    selected: (TextStyleOverride, char),
-    unselected: (TextStyleOverride, char)
-}
-
-impl Default for RadioStyle {
-    fn default() -> Self {
-        Self {
-            base: Default::default(),
-            selected: (Default::default(), 'x'),
-            unselected: (Default::default(), 'o')
-        }
-    }
-}
 
 impl Renderer for TerminalRenderer {
     type Style = RadioStyle;

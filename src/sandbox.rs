@@ -35,7 +35,7 @@ pub trait Sandbox: Sized {
         let mut renderer = TerminalRenderer::<Stdout>::default();
         let mut state = Self::new();
 
-        let mut cache = Some(Cache::default());
+        let mut cache = Cache::default();
         let mut cursor_position = Point::new(-1.0, -1.0); // Cursor available
 
         let mut messages = Vec::new();
@@ -44,7 +44,7 @@ pub trait Sandbox: Sized {
             let size = renderer.size();
             let bounds = Size::new(size.0 as f32, size.1 as f32);
             // Consumes the cache and renders the UI to primitives
-            let mut ui = UserInterface::build(state.view(), bounds, cache.take().unwrap(), &mut renderer);
+            let mut ui = UserInterface::build(state.view(), bounds, cache, &mut renderer);
 
             // Displays the new state of the sandbox using the renderer
             let primitives = ui.draw(&mut renderer, cursor_position);
@@ -66,7 +66,7 @@ pub trait Sandbox: Sized {
             }
 
             // Stores back the cache
-            cache = Some(ui.into_cache());
+            cache = ui.into_cache();
 
             // Applies updates on the state with given messages if any
             for message in messages.drain(..) {

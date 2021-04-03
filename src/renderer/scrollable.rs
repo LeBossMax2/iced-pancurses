@@ -1,13 +1,9 @@
-use crate::primitive::{Primitive, BoxStyle};
+use crate::primitive::Primitive;
+use crate::style::ScrollableStyle;
 use crate::TerminalRenderer;
 
 use iced_native::widget::scrollable;
 use iced_native::Rectangle;
-
-#[derive(Default, Clone)]
-pub struct ScrollableStyle {
-    background: BoxStyle
-}
 
 impl scrollable::Renderer for TerminalRenderer {
     type Style = ScrollableStyle;

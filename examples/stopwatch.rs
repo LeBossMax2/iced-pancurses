@@ -1,9 +1,11 @@
 use iced_native::widget::button;
 use iced_native::{
-    Align, Background, Button, Color, Column, Command, Container, Element, HorizontalAlignment,
+    Align, Color, Button, Column, Command, Container, Element, HorizontalAlignment,
     Length, Row, Subscription, Text,
 };
 use iced_pancurses::{Application, TerminalRenderer};
+use iced_pancurses::style::ButtonStyle;
+use iced_pancurses::conversion::color_from_rbg;
 use std::time::{Duration, Instant};
 
 pub fn main() -> iced_pancurses::Result {
@@ -95,6 +97,8 @@ impl Application for Stopwatch {
         .width(Length::Shrink);
 
         let button = |state, label, color: [f32; 3]| {
+            let mut style = ButtonStyle::default();
+            style.base = style.base.with_background_color(color_from_rbg(color));
             Button::new(
                 state,
                 Text::new(label)
@@ -102,7 +106,7 @@ impl Application for Stopwatch {
                     .horizontal_alignment(HorizontalAlignment::Center),
             )
             .min_width(10)
-            //.background(Background::Color(color.into()))
+            .style(style)
             .padding(1)
         };
 

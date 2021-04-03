@@ -2,7 +2,7 @@ use iced_native::{
     Align, Button, Color, Column, Command,
     Container, Element, Image, Length, Row, Text, button, image,
 };
-use iced_pancurses::{Application, TerminalRenderer};
+use iced_pancurses::{Application, TerminalRenderer, style::ButtonStyle, conversion::color_from_rbg};
 
 pub fn main() -> iced_pancurses::Result {
     Pokedex::run()
@@ -212,7 +212,9 @@ impl From<surf::Exception> for Error {
 }
 
 fn button<'a>(state: &'a mut button::State, text: &str) -> Button<'a, Message, TerminalRenderer> {
+    let mut style = ButtonStyle::default();
+    style.base = style.base.with_background_color(color_from_rbg([0.11, 0.42, 0.87]));
     Button::new(state, Text::new(text).color(Color::WHITE))
-        //.background(Color::from_rgb(0.11, 0.42, 0.87))
+        .style(style)
         .padding(1)
 }

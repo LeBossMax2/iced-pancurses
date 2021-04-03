@@ -1,15 +1,8 @@
-use crate::primitive::{Primitive, TextStyleOverride};
+use crate::primitive::Primitive;
 use crate::TerminalRenderer;
-use crate::renderer::{DefaultStyling, DefaultOverride};
+use crate::style::TextInputStyle;
 use iced_native::widget::text_input;
 use iced_native::{HorizontalAlignment, Point, Rectangle, VerticalAlignment};
-
-#[derive(Default, Clone)]
-pub struct TextInputStyle {
-    base: DefaultStyling,
-    placeholder: TextStyleOverride,
-    focused: DefaultOverride
-}
 
 impl text_input::Renderer for TerminalRenderer {
     type Style = TextInputStyle;

@@ -12,7 +12,8 @@ mod space;
 mod text;
 mod text_input;
 
-use crate::primitive::{Primitive, BoxStyle, TextStyle, BoxStyleOverride, TextStyleOverride};
+use crate::primitive::Primitive;
+use crate::style::DefaultStyling;
 use core::time::Duration;
 use iced_native::{
     keyboard, keyboard::KeyCode as IcedKeyCode,
@@ -108,10 +109,15 @@ fn convert_button(button: MouseButton) -> Button
     }
 }
 
+fn move_cursor(x: u16, y: u16,) -> Event
+{
+    Event::Mouse(IcedMouseEvent::CursorMoved { x: x as f32 + 0.5, y: y as f32 + 0.5 })
+}
+
 fn move_cursor_and(x: u16, y: u16, other: Event) -> Vec<Event>
 {
     vec![
-        Event::Mouse(IcedMouseEvent::CursorMoved { x: x as f32, y: y as f32 }),
+        move_cursor(x, y),
         other
     ]
 }
@@ -221,14 +227,15 @@ impl<W: Write> TerminalRenderer<W> {
                     Event::Mouse(IcedMouseEvent::ButtonPressed(convert_button(button)))),
             TermMouseEvent::Up(button, x, y, _modifier) =>
                 move_cursor_and(x, y,
-                    Event::Mouse(IcedMouseEvent::ButtonPressed(convert_button(button)))),
+                    Event::Mouse(IcedMouseEvent::ButtonReleased(convert_button(button)))),
+            TermMouseEvent::Drag(_button, x, y, _modifier) =>
+                vec![move_cursor(x, y)],
             TermMouseEvent::ScrollDown(x, y, _modifier) =>
                 move_cursor_and(x, y,
                     Event::Mouse(IcedMouseEvent::WheelScrolled { delta: ScrollDelta::Lines { x: 0.0, y: -1.0 } })),
             TermMouseEvent::ScrollUp(x, y, _modifier) =>
                 move_cursor_and(x, y,
-                    Event::Mouse(IcedMouseEvent::WheelScrolled { delta: ScrollDelta::Lines { x: 0.0, y: 1.0 } })),
-            _ => vec![]
+                    Event::Mouse(IcedMouseEvent::WheelScrolled { delta: ScrollDelta::Lines { x: 0.0, y: 1.0 } }))
         }
     }
 
@@ -332,61 +339,5 @@ impl<W: Write> TerminalRenderer<W> {
             Retrieved::TerminalSize(x, y) => (x, y),
             _ => unreachable!(),
         }
-    }
-}
-
-#[derive(Default, Clone)]
-pub struct DefaultStyling {
-    pub box_style: BoxStyle,
-    pub text_style: TextStyle
-}
-
-impl DefaultStyling
-{
-    pub fn with_box_style(mut self, style: BoxStyle) -> Self
-    {
-        self.box_style = style;
-        self
-    }
-
-    pub fn with_text_style(mut self, style: TextStyle) -> Self
-    {
-        self.text_style = style;
-        self
-    }
-
-    pub fn apply(&self, other: &DefaultOverride) -> Self
-    {
-        let box_style = self.box_style.apply(&other.box_style);
-        let text_style = self.text_style.apply(&other.text_style);
-        return  Self { box_style, text_style }
-    }
-}
-
-#[derive(Default, Clone)]
-pub struct DefaultOverride {
-    pub box_style: BoxStyleOverride,
-    pub text_style: TextStyleOverride
-}
-
-impl DefaultOverride
-{
-    pub fn with_box_style(mut self, style: BoxStyleOverride) -> Self
-    {
-        self.box_style = style;
-        self
-    }
-
-    pub fn with_text_style(mut self, style: TextStyleOverride) -> Self
-    {
-        self.text_style = style;
-        self
-    }
-
-    pub fn merge(&self, other: &DefaultOverride) -> Self
-    {
-        let box_style = self.box_style.merge(&other.box_style);
-        let text_style = self.text_style.merge(&other.text_style);
-        return  Self { box_style, text_style }
     }
 }

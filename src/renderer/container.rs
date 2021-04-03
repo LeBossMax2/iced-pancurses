@@ -1,9 +1,6 @@
-use crate::{primitive::Primitive, primitive::BoxStyleOverride, TerminalRenderer};
-use crate::renderer::DefaultOverride;
+use crate::{primitive::Primitive, TerminalRenderer};
+use crate::style::ContainerStyle;
 use iced_native::{container, Element, Layout, Point, Rectangle};
-
-#[derive(Default, Clone)]
-pub struct ContainerStyle(BoxStyleOverride, DefaultOverride);
 
 impl<W: std::io::Write> container::Renderer for TerminalRenderer<W> {
     type Style = ContainerStyle;
