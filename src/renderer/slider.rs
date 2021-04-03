@@ -24,10 +24,11 @@ impl slider::Renderer for TerminalRenderer {
         let (range_start, range_end) = range.into_inner();
         let marker_offset =
             bounds.width * ((value - range_start) / (range_end - range_start).max(1.0));
+        let x = ((bounds.x + marker_offset) as i32).min((bounds.x + bounds.width) as i32 - 1);
 
         Primitive::Group(vec![
             Primitive::BoxDisplay(bounds.snap(), style.background.clone()),
-            Primitive::Char(bounds.x as i32 + marker_offset as i32, bounds.y as i32, style.slider.1, style.slider.0.clone()),
+            Primitive::Char(x, bounds.y as i32, style.slider.1, style.slider.0.clone()),
         ])
     }
 }

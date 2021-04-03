@@ -270,10 +270,26 @@ pub struct ScrollableStyle {
     pub background: BoxStyle
 }
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct SliderStyle {
     pub background: BoxStyle,
     pub slider: (TextStyle, char)
+}
+
+impl Default for SliderStyle {
+    fn default() -> Self {
+        SliderStyle {
+            background: BoxStyle {
+                background_color: Color::Reset,
+                border: BorderStyle([
+                    ['├', '─', '┤'],
+                    ['├', '─', '┤'],
+                    ['├', '─', '┤']
+                ])
+            },
+            slider: (Default::default(), 'O')
+        }
+    }
 }
 
 #[derive(Default, Clone)]

@@ -147,6 +147,21 @@ fn press_and_release(key_code: IcedKeyCode, modifiers: terminal::KeyModifiers) -
     ]
 }
 
+fn get_border_index(value: u32, max: u32) -> usize {
+    if max < 2 {
+        1
+    }
+    else if value == 0 {
+        0
+    }
+    else if value < max - 1 {
+        1
+    }
+    else {
+        2
+    }
+}
+
 impl<W: Write> TerminalRenderer<W> {
     /// Polls event from the terminal window
     pub fn handle(&self) -> crate::Result<Vec<Event>> {
@@ -296,17 +311,17 @@ impl<W: Write> TerminalRenderer<W> {
             }
             Primitive::BoxDisplay(bounds, style) => {
                 self.terminal.batch(Action::SetBackgroundColor(style.background_color))?;
-                for y in bounds.y as u32..(bounds.y + bounds.height) as u32
+                for y in 0..bounds.height
                 {
                     self.terminal.batch(Action::MoveCursorTo(
                         bounds.x as u16,
-                        y as u16,
+                        (y + bounds.y) as u16,
                     ))?;
-                    let y_index = (y - bounds.y + bounds.height - 3) / (bounds.height - 2);
-                    for x in bounds.x as u32..(bounds.x + bounds.width) as u32
+                    let y_index = get_border_index(y, bounds.height);
+                    for x in 0..bounds.width
                     {
-                        let x_index = (x - bounds.x + bounds.width - 3) / (bounds.width - 2);
-                        write!(self.terminal, "{}", style.border.0[y_index as usize][x_index as usize])?;
+                        let x_index = get_border_index(x, bounds.width);
+                        write!(self.terminal, "{}", style.border.0[y_index][x_index])?;
                     }
                 }
                 self.terminal.batch(Action::SetBackgroundColor(Color::Reset))?;
