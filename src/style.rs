@@ -1,4 +1,4 @@
-pub use terminal::Color;
+pub use crossterm::style::Color;
 
 #[derive(Clone)]
 pub struct BoxStyle {

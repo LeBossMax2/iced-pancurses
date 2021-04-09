@@ -23,18 +23,23 @@ use iced_native::{
 use iced_native::layout::Limits;
 use iced_native::{Event, Renderer, Rectangle};
 use std::io::Write;
-use terminal::{
-    Action, Attribute, Clear, Retrieved, Terminal, Value, Color,
-    KeyCode as TermKeyCode, MouseEvent as TermMouseEvent, MouseButton
+use crossterm::{
+    QueueableCommand, queue, execute, terminal, cursor,
+    style, style::Attribute, style::Color
+};
+use crossterm::event::{
+    self, read, poll, Event as TermEvent,
+    KeyModifiers, KeyCode as TermKeyCode, KeyEvent as TermKeyEvent,
+    MouseEvent as TermMouseEvent, MouseButton, MouseEventKind
 };
 
 /// Terminal Renderer implementation for Iced
 ///
 /// This is a both the shell and the renderer, it is the basic building block of your Iced
 /// Application
-pub struct TerminalRenderer<W: Write = std::io::Stdout> {
+pub struct TerminalRenderer<W: Write + QueueableCommand = std::io::Stdout> {
     /// Terminal window to use to print UI elements
-    terminal: Terminal<W>,
+    terminal: W,
     /// Terminal refresh delay, allows any terminal app to be non-blocking
     ///
     /// * Some(Duration) will set the target FPS of the Application
@@ -55,13 +60,27 @@ impl Default for TerminalRenderer<std::io::Stdout> {
 impl TerminalRenderer<std::io::Stdout> {
     pub fn new() -> crate::Result<Self> {
         let mut renderer = TerminalRenderer {
-            terminal: terminal::stdout(),
+            terminal: std::io::stdout(),
             refresh_delay: None,
         };
 
         renderer.setup_terminal()?;
 
         Ok(renderer)
+    }
+}
+
+impl<W: Write> Drop for TerminalRenderer<W> {
+    fn drop(&mut self) {
+        queue!(self.terminal,
+            style::SetAttribute(Attribute::Reset),
+            terminal::LeaveAlternateScreen,
+            event::DisableMouseCapture,
+            cursor::Show,
+            cursor::EnableBlinking,
+            );
+        self.flush();
+        terminal::disable_raw_mode();
     }
 }
 
@@ -75,17 +94,10 @@ impl<W: Write> Renderer for TerminalRenderer<W> {
         element: &iced_native::Element<'a, Message, Self>,
         limits: &Limits,
     ) -> iced_native::layout::Node {
-        let abc = self
-            .terminal
-            .get(Value::TerminalSize)
+        let (x, y) = terminal::size()
             .expect("Failed to read terminal size");
-        match abc {
-            Retrieved::TerminalSize(x, y) => {
-                let new_limits = limits.max_width(x as u32).max_height(y as u32);
-                element.layout(self, &new_limits)
-            }
-            _ => unreachable!(),
-        }
+        let new_limits = limits.max_width(x as u32).max_height(y as u32);
+        element.layout(self, &new_limits)
     }
 
     fn overlay(
@@ -104,8 +116,7 @@ fn convert_button(button: MouseButton) -> Button
     match button {
         MouseButton::Left => Button::Left,
         MouseButton::Right => Button::Right,
-        MouseButton::Middle => Button::Middle,
-        MouseButton::Unknown => Button::Other(4)
+        MouseButton::Middle => Button::Middle
     }
 }
 
@@ -122,17 +133,17 @@ fn move_cursor_and(x: u16, y: u16, other: Event) -> Vec<Event>
     ]
 }
 
-fn convert_modifiers(modifiers: terminal::KeyModifiers) -> keyboard::Modifiers
+fn convert_modifiers(modifiers: KeyModifiers) -> keyboard::Modifiers
 {
     keyboard::Modifiers {
-        shift: modifiers.contains(terminal::KeyModifiers::SHIFT),
-        control: modifiers.contains(terminal::KeyModifiers::CONTROL),
-        alt: modifiers.contains(terminal::KeyModifiers::ALT),
+        shift: modifiers.contains(KeyModifiers::SHIFT),
+        control: modifiers.contains(KeyModifiers::CONTROL),
+        alt: modifiers.contains(KeyModifiers::ALT),
         logo: false
     }
 }
 
-fn press_and_release(key_code: IcedKeyCode, modifiers: terminal::KeyModifiers) -> Vec<Event>
+fn press_and_release(key_code: IcedKeyCode, modifiers: KeyModifiers) -> Vec<Event>
 {
     let modifiers = convert_modifiers(modifiers);
     vec![
@@ -165,32 +176,29 @@ fn get_border_index(value: u32, max: u32) -> usize {
 impl<W: Write> TerminalRenderer<W> {
     /// Polls event from the terminal window
     pub fn handle(&self) -> crate::Result<Vec<Event>> {
-        let input = self.terminal.get(Value::Event(self.refresh_delay))?;
+        if let Some(duration) = self.refresh_delay {
+            if !poll(duration)? {
+                return Ok(vec![]);
+            }
+        }
+        let input = read()?;
         Ok(match input {
-            Retrieved::Event(Some(terminal::Event::Key(ke))) =>
+            TermEvent::Key(ke) =>
             {
                 Self::handle_key(ke)
             },
-            Retrieved::Event(Some(terminal::Event::Mouse(me))) =>
+            TermEvent::Mouse(me) =>
             {
                 Self::handle_mouse(me)
             },
-            Retrieved::Event(Some(terminal::Event::Resize)) =>
+            TermEvent::Resize(w, h) =>
             {
-                let size = self.size();
-                vec![Event::Window(WindowEvent::Resized { width: size.0 as u32, height: size.1 as u32 })]
-            },
-            /*
-            Some(Input::KeyResize) => {
-                self.flush();
-                None
+                vec![Event::Window(WindowEvent::Resized { width: w as u32, height: h as u32 })]
             }
-            */
-            _ => vec![],
         })
     }
     
-    fn handle_key(event: terminal::KeyEvent) -> Vec<Event> {
+    fn handle_key(event: TermKeyEvent) -> Vec<Event> {
         match event.code
         {
             TermKeyCode::Char(ch) => vec![Event::Keyboard(keyboard::Event::CharacterReceived(ch))],
@@ -203,7 +211,7 @@ impl<W: Write> TerminalRenderer<W> {
             TermKeyCode::PageUp => press_and_release(IcedKeyCode::PageUp, event.modifiers),
             TermKeyCode::PageDown => press_and_release(IcedKeyCode::PageDown, event.modifiers),
             TermKeyCode::Tab => press_and_release(IcedKeyCode::Tab, event.modifiers),
-            TermKeyCode::BackTab => press_and_release(IcedKeyCode::Tab, event.modifiers | terminal::KeyModifiers::SHIFT), // backtab = shift + tab
+            TermKeyCode::BackTab => press_and_release(IcedKeyCode::Tab, event.modifiers | KeyModifiers::SHIFT), // backtab = shift + tab
             TermKeyCode::Delete => press_and_release(IcedKeyCode::Delete, event.modifiers),
             TermKeyCode::Insert => press_and_release(IcedKeyCode::Insert, event.modifiers),
             TermKeyCode::Esc => press_and_release(IcedKeyCode::Escape, event.modifiers),
@@ -236,39 +244,45 @@ impl<W: Write> TerminalRenderer<W> {
     }
 
     fn handle_mouse(event: TermMouseEvent) -> Vec<Event> {
-        match event {
-            TermMouseEvent::Down(button, x, y, _modifier) =>
+        let x = event.column;
+        let y = event.row;
+        match event.kind {
+            MouseEventKind::Down(button) =>
                 move_cursor_and(x, y,
                     Event::Mouse(IcedMouseEvent::ButtonPressed(convert_button(button)))),
-            TermMouseEvent::Up(button, x, y, _modifier) =>
+            MouseEventKind::Up(button) =>
                 move_cursor_and(x, y,
                     Event::Mouse(IcedMouseEvent::ButtonReleased(convert_button(button)))),
-            TermMouseEvent::Drag(_button, x, y, _modifier) =>
+            MouseEventKind::Drag(_button) =>
                 vec![move_cursor(x, y)],
-            TermMouseEvent::ScrollDown(x, y, _modifier) =>
+            MouseEventKind::Moved =>
+                vec![move_cursor(x, y)],
+            MouseEventKind::ScrollDown =>
                 move_cursor_and(x, y,
                     Event::Mouse(IcedMouseEvent::WheelScrolled { delta: ScrollDelta::Lines { x: 0.0, y: -1.0 } })),
-            TermMouseEvent::ScrollUp(x, y, _modifier) =>
+            MouseEventKind::ScrollUp =>
                 move_cursor_and(x, y,
                     Event::Mouse(IcedMouseEvent::WheelScrolled { delta: ScrollDelta::Lines { x: 0.0, y: 1.0 } }))
         }
     }
 
     pub fn clear(&mut self) -> crate::Result {
-        self.terminal.act(Action::ClearTerminal(Clear::All))
+        execute!(self.terminal, terminal::Clear(terminal::ClearType::All))
     }
 
     pub fn setup_terminal(&mut self) -> crate::Result {
         // Resets terminal state
-        self.terminal.batch(Action::SetAttribute(Attribute::Reset))?;
-        self.terminal.batch(Action::ClearTerminal(Clear::All))?;
+        // And sets up various data for correct terminal processing
+        terminal::enable_raw_mode()?;
+        queue!(self.terminal,
+            style::SetAttribute(Attribute::Reset),
+            //terminal::Clear(terminal::ClearType::All),
+            terminal::EnterAlternateScreen,
+            event::EnableMouseCapture,
+            cursor::Hide,
+            cursor::DisableBlinking,
+            )?;
 
-        // Sets up various data for correct terminal processing
-        self.terminal.batch(Action::EnableRawMode)?;
-        self.terminal.batch(Action::EnterAlternateScreen)?;
-        self.terminal.batch(Action::EnableMouseCapture)?;
-        self.terminal.batch(Action::HideCursor)?;
-        self.terminal.batch(Action::DisableBlinking)?;
         self.flush()?;
         Ok(())
     }
@@ -293,13 +307,13 @@ impl<W: Write> TerminalRenderer<W> {
                 .map(|p| self.draw_batch(p))
                 .collect::<crate::Result>(),
             Primitive::Text(texts, bounds, style) => {
-                self.terminal.batch(Action::SetBackgroundColor(style.background_color))?;
-                self.terminal.batch(Action::SetForegroundColor(style.foreground_color))?;
+                queue!(self.terminal, style::SetBackgroundColor(style.background_color))?;
+                queue!(self.terminal, style::SetForegroundColor(style.foreground_color))?;
                 let mut y = 0;
                 texts
                     .into_iter()
                     .map(|l| {
-                        self.terminal.batch(Action::MoveCursorTo(
+                        queue!(self.terminal, cursor::MoveTo(
                             bounds.x as u16,
                             bounds.y as u16 + y as u16,
                         ))?;
@@ -310,10 +324,10 @@ impl<W: Write> TerminalRenderer<W> {
                     .collect::<crate::Result>()
             }
             Primitive::BoxDisplay(bounds, style) => {
-                self.terminal.batch(Action::SetBackgroundColor(style.background_color))?;
+                queue!(self.terminal, style::SetBackgroundColor(style.background_color))?;
                 for y in 0..bounds.height
                 {
-                    self.terminal.batch(Action::MoveCursorTo(
+                    queue!(self.terminal, cursor::MoveTo(
                         bounds.x as u16,
                         (y + bounds.y) as u16,
                     ))?;
@@ -324,14 +338,13 @@ impl<W: Write> TerminalRenderer<W> {
                         write!(self.terminal, "{}", style.border.0[y_index][x_index])?;
                     }
                 }
-                self.terminal.batch(Action::SetBackgroundColor(Color::Reset))?;
+                queue!(self.terminal, style::SetBackgroundColor(Color::Reset))?;
                 Ok(())
             }
             Primitive::Char(x, y, c, style) => {
-                self.terminal.batch(Action::SetBackgroundColor(style.background_color))?;
-                self.terminal.batch(Action::SetForegroundColor(style.foreground_color))?;
-                self.terminal
-                    .batch(Action::MoveCursorTo(x as u16, y as u16))?;
+                queue!(self.terminal, style::SetBackgroundColor(style.background_color))?;
+                queue!(self.terminal, style::SetForegroundColor(style.foreground_color))?;
+                queue!(self.terminal, cursor::MoveTo(x as u16, y as u16))?;
                 self.terminal.write(format!("{}", c).as_bytes())?;
                 Ok(())
             }
@@ -339,20 +352,15 @@ impl<W: Write> TerminalRenderer<W> {
         }
     }
 
-    pub fn flush(&self) -> crate::Result
+    pub fn flush(&mut self) -> crate::Result
     {
-        self.terminal.flush_batch()
+        self.terminal.flush()
+            .map_err(|io_err| crossterm::ErrorKind::IoError(io_err))
     }
 
     /// Gets the current size of the terminal root window
     pub fn size(&self) -> (u16, u16) {
-        match self
-            .terminal
-            .get(Value::TerminalSize)
+        terminal::size()
             .expect("Failed to get terminal size")
-        {
-            Retrieved::TerminalSize(x, y) => (x, y),
-            _ => unreachable!(),
-        }
     }
 }

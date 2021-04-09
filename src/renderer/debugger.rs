@@ -1,7 +1,7 @@
 use crate::{primitive::Primitive, style::BoxStyle, TerminalRenderer};
 use iced_native::layout::Debugger;
 use iced_native::{Layout, Color, Point, Widget, Rectangle};
-use terminal::Color as TermColor;
+use crossterm::style::Color as TermColor;
 
 impl Debugger for TerminalRenderer {
     fn explain<Message>(
