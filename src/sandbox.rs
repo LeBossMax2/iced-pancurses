@@ -36,7 +36,7 @@ pub trait Sandbox: Sized {
         let mut state = Self::new();
 
         let mut cache = Cache::default();
-        let mut cursor_position = Point::new(-1.0, -1.0); // Cursor available
+        let mut cursor_position = Point::new(-1.0, -1.0); // Cursor not available
 
         let mut messages = Vec::new();
 

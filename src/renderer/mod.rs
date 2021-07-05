@@ -72,15 +72,9 @@ impl TerminalRenderer<std::io::Stdout> {
 
 impl<W: Write> Drop for TerminalRenderer<W> {
     fn drop(&mut self) {
-        queue!(self.terminal,
-            style::SetAttribute(Attribute::Reset),
-            terminal::LeaveAlternateScreen,
-            event::DisableMouseCapture,
-            cursor::Show,
-            cursor::EnableBlinking,
-            );
-        self.flush();
-        terminal::disable_raw_mode();
+        self.reset_terminal()
+            .err()
+            .map(|err| eprintln!("Error reseting terminal : {:?}", err));
     }
 }
 
@@ -284,6 +278,19 @@ impl<W: Write> TerminalRenderer<W> {
             )?;
 
         self.flush()?;
+        Ok(())
+    }
+
+    fn reset_terminal(&mut self) -> crate::Result {
+        queue!(self.terminal,
+            style::SetAttribute(Attribute::Reset),
+            terminal::LeaveAlternateScreen,
+            event::DisableMouseCapture,
+            cursor::Show,
+            cursor::EnableBlinking,
+            )?;
+        self.flush()?;
+        terminal::disable_raw_mode()?;
         Ok(())
     }
 
